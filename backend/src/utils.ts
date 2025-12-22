@@ -1,0 +1,29 @@
+import crypto from "node:crypto";
+
+export function sha256Hex(input: string | Uint8Array) {
+  const h = crypto.createHash("sha256");
+  h.update(input);
+  return h.digest("hex");
+}
+
+export function absolutizeUrl(base: string, href: string) {
+  return new URL(href, base).toString();
+}
+
+export function stripHtmlToText(html: string) {
+  const withoutScripts = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ");
+  const text = withoutScripts
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/?p[^>]*>/gi, "\n")
+    .replace(/<\/?div[^>]*>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n\s+/g, "\n")
+    .replace(/[ \\t\\f\\r]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return text;
+}
