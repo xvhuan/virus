@@ -24,8 +24,8 @@ export async function syncLatest(config: AppConfig, store: FileStore, opts?: { l
   const listHtml = await fetchText(config.LIST_URL, headers, 30_000);
   const list = parseWeeklyList(config.LIST_URL, listHtml).slice(0, limit);
 
-  // 并行处理，提高同步速度（限制并发数避免被封）
-  const CONCURRENCY = 5;
+  // 串行处理 AI 请求，避免并发导致超时
+  const CONCURRENCY = 1;
   let updated = 0;
 
   const processItem = async (item: (typeof list)[0]) => {
@@ -36,9 +36,10 @@ export async function syncLatest(config: AppConfig, store: FileStore, opts?: { l
     const htmlHash = sha256Hex(detail.htmlText);
     const contentHash = sha256Hex(`${detail.title}\n${detail.publishDate}\n${detail.pdfUrl ?? ""}\n${htmlHash}`);
     const shouldUpdate = !existing || existing.contentHash !== contentHash;
+    // 只在没有成功的 AI 总结时才请求：新报告、无 AI、或之前失败的
     const needsAi =
       llmConfigured &&
-      (!!shouldUpdate || existing?.ai === null || (existing?.aiRaw ?? "").startsWith("AI 总结失败"));
+      (!existing || existing.ai === null || (existing?.aiRaw ?? "").startsWith("AI 总结失败"));
     if (!shouldUpdate && !needsAi) return false;
 
     let pdfText = existing?.pdfText ?? "";
