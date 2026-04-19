@@ -1,5 +1,5 @@
 import { AppConfig } from "./config.js";
-import { FileStore } from "./storage.js";
+import { FileStore, selectIndexReports } from "./storage.js";
 import { fetchBytes, fetchText, parseWeeklyDetail, parseWeeklyList } from "./cdc.js";
 import { extractPdfText } from "./pdf.js";
 import { summarizeWeeklyReport } from "./llm.js";
@@ -21,7 +21,7 @@ export async function syncLatest(config: AppConfig, store: FileStore, opts?: { l
     accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   };
 
-  const listHtml = await fetchText(config.LIST_URL, headers, 30_000);
+  const listHtml = await fetchText(config.LIST_URL, headers, 60_000);
   const list = parseWeeklyList(config.LIST_URL, listHtml).slice(0, limit);
 
   // 串行处理 AI 请求，避免并发导致超时
@@ -30,7 +30,7 @@ export async function syncLatest(config: AppConfig, store: FileStore, opts?: { l
 
   const processItem = async (item: (typeof list)[0]) => {
     const existing = await store.getReport(item.id);
-    const detailHtml = await fetchText(item.href, headers, 30_000);
+    const detailHtml = await fetchText(item.href, headers, 60_000);
     const detail = parseWeeklyDetail(item.href, detailHtml);
 
     const htmlHash = sha256Hex(detail.htmlText);
@@ -45,7 +45,7 @@ export async function syncLatest(config: AppConfig, store: FileStore, opts?: { l
     let pdfText = existing?.pdfText ?? "";
     const needPdf = !!detail.pdfUrl && (existing?.pdfUrl !== detail.pdfUrl || !existing?.pdfText);
     if (detail.pdfUrl && needPdf) {
-      const pdfBytes = await fetchBytes(detail.pdfUrl, headers, 60_000);
+      const pdfBytes = await fetchBytes(detail.pdfUrl, headers, 180_000);
       await store.writePdf(item.id, pdfBytes);
       pdfText = await extractPdfText(pdfBytes);
     }
@@ -96,17 +96,17 @@ export async function syncLatest(config: AppConfig, store: FileStore, opts?: { l
       return r;
     }),
   );
-  const reports = all
-    .filter((r): r is NonNullable<typeof r> => !!r)
-    .sort((a, b) => (b.publishDate ?? b.updatedAt).localeCompare(a.publishDate ?? a.updatedAt))
-    .map((r) => ({
-      id: r.id,
-      title: r.title,
-      publishDate: r.publishDate,
-      htmlUrl: r.htmlUrl,
-      pdfUrl: r.pdfUrl,
-      updatedAt: r.updatedAt,
-    }));
+  const reports = selectIndexReports(
+    all.filter((r): r is NonNullable<typeof r> => !!r),
+    list.length,
+  ).map((r) => ({
+    id: r.id,
+    title: r.title,
+    publishDate: r.publishDate,
+    htmlUrl: r.htmlUrl,
+    pdfUrl: r.pdfUrl,
+    updatedAt: r.updatedAt,
+  }));
 
   const newIndex = { ...index, lastSyncAt: new Date().toISOString(), reports };
   await store.writeIndex(newIndex);

@@ -49,8 +49,16 @@ function toIndexReport(report: ReportRecord) {
   };
 }
 
-function compareReportTime(a: ReportRecord, b: ReportRecord) {
-  return (b.publishDate ?? b.updatedAt).localeCompare(a.publishDate ?? a.updatedAt);
+function compareValueDesc(a: string | null | undefined, b: string | null | undefined) {
+  return (b ?? "").localeCompare(a ?? "");
+}
+
+export function compareReportTime(a: Pick<ReportRecord, "id" | "publishDate" | "updatedAt">, b: Pick<ReportRecord, "id" | "publishDate" | "updatedAt">) {
+  return (
+    compareValueDesc(a.publishDate, b.publishDate) ||
+    compareValueDesc(a.updatedAt, b.updatedAt) ||
+    compareValueDesc(a.id, b.id)
+  );
 }
 
 function normalizeTs(value: string | null | undefined) {
@@ -71,6 +79,26 @@ function sameIndex(a: IndexFile, b: IndexFile) {
   if (a.lastSyncAt !== b.lastSyncAt) return false;
   if (a.reports.length !== b.reports.length) return false;
   return a.reports.every((report, idx) => JSON.stringify(report) === JSON.stringify(b.reports[idx]));
+}
+
+function toReportGroupKey(report: Pick<ReportRecord, "title" | "publishDate">) {
+  return `${report.title}\n${report.publishDate ?? ""}`;
+}
+
+export function selectIndexReports(reports: ReportRecord[], maxReports = reports.length) {
+  const sorted = [...reports].sort(compareReportTime);
+  const picked: ReportRecord[] = [];
+  const seen = new Set<string>();
+
+  for (const report of sorted) {
+    const key = toReportGroupKey(report);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    picked.push(report);
+    if (picked.length >= maxReports) break;
+  }
+
+  return picked;
 }
 
 export class FileStore {
@@ -174,12 +202,10 @@ export class FileStore {
           return await this.getReport(id);
         }),
       )
-    )
-      .filter((report): report is ReportRecord => !!report)
-      .sort(compareReportTime);
+    ).filter((report): report is ReportRecord => !!report);
 
     const maxReports = current.reports.length > 0 ? current.reports.length : reports.length;
-    const pickedReports = reports.slice(0, maxReports);
+    const pickedReports = selectIndexReports(reports, maxReports);
     const latestReportUpdatedAt = pickedReports[0]?.updatedAt ?? null;
 
     return {

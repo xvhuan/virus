@@ -95,3 +95,66 @@ test("readIndex 会在 report 文件比 index 更新时自动修复索引", asyn
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test("readIndex 会对同一周重复报告去重并保留更新更晚的来源", async () => {
+  const { root, dataDir, store } = await makeTempStore();
+
+  try {
+    const legacyReport: ReportRecord = {
+      id: "t20260416_1835083",
+      title: "2026 第15周",
+      weekText: "2026 第15周",
+      publishDate: "2026-04-16",
+      htmlUrl: "https://ivdc.chinacdc.cn/cnic/zyzx/lgzb/202604/t20260416_1835083.htm",
+      pdfUrl: "https://ivdc.chinacdc.cn/cnic/zyzx/lgzb/202604/legacy.pdf",
+      htmlText: "legacy",
+      pdfText: "legacy",
+      ai: null,
+      aiRaw: null,
+      contentHash: "legacy",
+      createdAt: "2026-04-16T08:03:55.327Z",
+      updatedAt: "2026-04-16T10:02:54.396Z",
+    };
+
+    const newerReport: ReportRecord = {
+      id: "t20260416_1835095",
+      title: "2026 第15周",
+      weekText: "2026 第15周",
+      publishDate: "2026-04-16",
+      htmlUrl: "https://www.chinacdc.cn/jksj/jksj04_14249/202604/t20260416_1835095.html",
+      pdfUrl: "https://www.chinacdc.cn/jksj/jksj04_14249/202604/latest.pdf",
+      htmlText: "newer",
+      pdfText: "newer",
+      ai: null,
+      aiRaw: null,
+      contentHash: "newer",
+      createdAt: "2026-04-19T13:34:09.209Z",
+      updatedAt: "2026-04-19T13:34:09.210Z",
+    };
+
+    await writeReport(dataDir, legacyReport);
+    await writeReport(dataDir, newerReport);
+    await writeIndex(dataDir, {
+      lastSyncAt: legacyReport.updatedAt,
+      reports: [
+        {
+          id: legacyReport.id,
+          title: legacyReport.title,
+          publishDate: legacyReport.publishDate,
+          htmlUrl: legacyReport.htmlUrl,
+          pdfUrl: legacyReport.pdfUrl,
+          updatedAt: legacyReport.updatedAt,
+        },
+      ],
+    });
+
+    const index = await store.readIndex();
+
+    assert.equal(index.reports.length, 1);
+    assert.equal(index.reports[0]?.id, newerReport.id);
+    assert.equal(index.reports[0]?.htmlUrl, newerReport.htmlUrl);
+    assert.equal(index.lastSyncAt, newerReport.updatedAt);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
