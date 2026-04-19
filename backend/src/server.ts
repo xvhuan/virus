@@ -4,7 +4,8 @@ import fastifyStatic from "@fastify/static";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { AppConfig } from "./config.js";
-import { FileStore } from "./storage.js";
+import { FileStore, selectIndexReports } from "./storage.js";
+import { extractMetricsFromReport } from "./metrics.js";
 import { syncLatest } from "./sync.js";
 import { resolveFromBackendRoot } from "./paths.js";
 
@@ -93,10 +94,10 @@ export async function buildServer(config: AppConfig, store: FileStore) {
   app.get("/api/series", async () => {
     const index = await store.readIndex();
     const reports = await Promise.all(index.reports.map((r) => store.getReport(r.id)));
-    return reports
-      .filter((r): r is NonNullable<typeof r> => !!r)
+    return selectIndexReports(reports.filter((r): r is NonNullable<typeof r> => !!r), index.reports.length)
       .map((r) => {
-        const m = (r.ai as any)?.metrics;
+        const aiMetrics = (r.ai as any)?.metrics ?? null;
+        const m = aiMetrics ?? extractMetricsFromReport(r);
         return {
           id: r.id,
           publishDate: r.publishDate,

@@ -81,8 +81,9 @@ function sameIndex(a: IndexFile, b: IndexFile) {
   return a.reports.every((report, idx) => JSON.stringify(report) === JSON.stringify(b.reports[idx]));
 }
 
-function toReportGroupKey(report: Pick<ReportRecord, "title" | "publishDate">) {
-  return `${report.title}\n${report.publishDate ?? ""}`;
+function toReportGroupKey(report: Pick<ReportRecord, "title" | "weekText" | "publishDate">) {
+  const key = report.weekText?.trim() || report.title?.trim();
+  return key || `${report.publishDate ?? ""}`;
 }
 
 export function selectIndexReports(reports: ReportRecord[], maxReports = reports.length) {
