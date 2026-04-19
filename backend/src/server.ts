@@ -12,6 +12,17 @@ export async function buildServer(config: AppConfig, store: FileStore) {
   const app = Fastify({ logger: true });
   await app.register(cors, { origin: true });
 
+  app.addHook("onSend", async (req, reply, payload) => {
+    if (req.url.startsWith("/api/")) {
+      reply.header("Cache-Control", "no-store");
+      reply.header("CDN-Cache-Control", "no-store");
+      reply.header("Surrogate-Control", "no-store");
+      reply.header("Pragma", "no-cache");
+      reply.header("Expires", "0");
+    }
+    return payload;
+  });
+
   // 静态提供已下载的 PDF
   await app.register(fastifyStatic, {
     root: path.join(resolveFromBackendRoot(config.DATA_DIR), "pdfs"),

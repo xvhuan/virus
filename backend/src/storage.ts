@@ -38,6 +38,41 @@ async function atomicWriteJson(filePath: string, data: unknown) {
   await fs.rename(tmp, filePath);
 }
 
+function toIndexReport(report: ReportRecord) {
+  return {
+    id: report.id,
+    title: report.title,
+    publishDate: report.publishDate,
+    htmlUrl: report.htmlUrl,
+    pdfUrl: report.pdfUrl,
+    updatedAt: report.updatedAt,
+  };
+}
+
+function compareReportTime(a: ReportRecord, b: ReportRecord) {
+  return (b.publishDate ?? b.updatedAt).localeCompare(a.publishDate ?? a.updatedAt);
+}
+
+function normalizeTs(value: string | null | undefined) {
+  if (!value) return null;
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+function pickLastSyncAt(current: string | null, latestReportUpdatedAt: string | null) {
+  const currentMs = normalizeTs(current);
+  const latestMs = normalizeTs(latestReportUpdatedAt);
+  if (currentMs === null) return latestReportUpdatedAt;
+  if (latestMs === null) return current;
+  return latestMs > currentMs ? latestReportUpdatedAt : current;
+}
+
+function sameIndex(a: IndexFile, b: IndexFile) {
+  if (a.lastSyncAt !== b.lastSyncAt) return false;
+  if (a.reports.length !== b.reports.length) return false;
+  return a.reports.every((report, idx) => JSON.stringify(report) === JSON.stringify(b.reports[idx]));
+}
+
 export class FileStore {
   private indexPath: string;
   private reportsDir: string;
@@ -54,6 +89,18 @@ export class FileStore {
   }
 
   async readIndex(): Promise<IndexFile> {
+    const current = await this.readStoredIndex();
+    const repaired = await this.rebuildIndexFromReports(current);
+    if (repaired && !sameIndex(current, repaired)) {
+      await this.writeIndex(repaired);
+      return repaired;
+    }
+    if (repaired) return repaired;
+
+    return current;
+  }
+
+  private async readStoredIndex(): Promise<IndexFile> {
     try {
       const raw = await fs.readFile(this.indexPath, "utf-8");
       return JSON.parse(raw) as IndexFile;
@@ -106,5 +153,38 @@ export class FileStore {
     await fs.writeFile(p, bytes);
     return p;
   }
-}
 
+  private async rebuildIndexFromReports(current: IndexFile): Promise<IndexFile | null> {
+    let files: string[];
+    try {
+      files = await fs.readdir(this.reportsDir);
+    } catch {
+      return null;
+    }
+
+    const reportIds = files
+      .filter((file) => file.endsWith(".json") && file !== "index.json")
+      .map((file) => file.slice(0, -".json".length));
+
+    if (reportIds.length === 0) return current;
+
+    const reports = (
+      await Promise.all(
+        reportIds.map(async (id) => {
+          return await this.getReport(id);
+        }),
+      )
+    )
+      .filter((report): report is ReportRecord => !!report)
+      .sort(compareReportTime);
+
+    const maxReports = current.reports.length > 0 ? current.reports.length : reports.length;
+    const pickedReports = reports.slice(0, maxReports);
+    const latestReportUpdatedAt = pickedReports[0]?.updatedAt ?? null;
+
+    return {
+      lastSyncAt: pickLastSyncAt(current.lastSyncAt, latestReportUpdatedAt),
+      reports: pickedReports.map(toIndexReport),
+    };
+  }
+}

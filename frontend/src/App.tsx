@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import ReactECharts from 'echarts-for-react'
-import { Activity, Calendar, Shield, AlertTriangle, ExternalLink, FileText, TrendingUp, ClipboardList, Clock, Pill, Microscope, MapPin, Syringe } from 'lucide-react'
+import { Activity, Calendar, Shield, AlertTriangle, ExternalLink, FileText, TrendingUp, ClipboardList, Clock, Pill, Microscope, MapPin, Syringe, Github } from 'lucide-react'
 import './App.css'
+import { buildApiUrl } from './api'
+import { AUTHOR_NAME, REPO_URL, SITE_TITLE } from './site'
 
 type IndexItem = {
   id: string
@@ -66,11 +68,11 @@ function App() {
   async function loadAll() {
     setLoading(true)
     try {
-      const idx = await fetch('/api/index').then((r) => r.json())
+      const idx = await fetch(buildApiUrl('/api/index')).then((r) => r.json())
       setIndex(idx)
       const latestId = idx?.reports?.[0]?.id ?? null
       setSelectedId((prev) => prev ?? latestId)
-      const rows = await fetch('/api/series').then((r) => r.json())
+      const rows = await fetch(buildApiUrl('/api/series')).then((r) => r.json())
       setSeries(rows)
     } finally {
       setLoading(false)
@@ -78,7 +80,7 @@ function App() {
   }
 
   async function loadReport(id: string) {
-    const r = await fetch(`/api/reports/${encodeURIComponent(id)}`).then((rr) => rr.json())
+    const r = await fetch(buildApiUrl(`/api/reports/${encodeURIComponent(id)}`)).then((rr) => rr.json())
     setReport(r)
   }
 
@@ -186,7 +188,7 @@ function App() {
           <div className="header-left">
             <div className="logo"><Activity size={24} /></div>
             <div className="title">
-              <h1>流感监测站</h1>
+              <h1>{SITE_TITLE}</h1>
               <div className="sub">
                 <Clock size={12} />
                 <span>{loading ? '加载中…' : `同步于 ${fmtBeijingTime(index?.lastSyncAt)}`}</span>
@@ -194,6 +196,19 @@ function App() {
                 <span>数据来源：国家流感中心周报</span>
               </div>
             </div>
+          </div>
+          <div className="header-right">
+            <a
+              href={REPO_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="repo-link"
+              aria-label="访问 GitHub 仓库"
+              title="访问 GitHub 仓库"
+            >
+              <Github size={18} />
+            </a>
+            <div className="author-text">作者: {AUTHOR_NAME}</div>
           </div>
         </header>
 

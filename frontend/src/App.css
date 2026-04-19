@@ -35,6 +35,13 @@
   gap: 16px;
 }
 
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
 .logo {
   width: 48px;
   height: 48px;
@@ -66,6 +73,33 @@
 }
 .title .sub .divider {
   color: #cbd5e1;
+}
+
+.repo-link {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.repo-link:hover {
+  color: #111827;
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  transform: translateY(-1px);
+}
+
+.author-text {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
 }
 
 /* Grid */
@@ -431,6 +465,10 @@
   .header {
     padding: 16px;
   }
+
+  .header-right {
+    gap: 6px;
+  }
   
   .title h1 {
     font-size: 18px;
@@ -486,6 +524,13 @@
     gap: 10px;
     width: 100%;
   }
+
+  .header-right {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
   
   .logo {
     width: 36px;
@@ -519,6 +564,16 @@
   
   .title .sub .divider {
     display: none;
+  }
+
+  .repo-link {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+
+  .author-text {
+    font-size: 12px;
   }
   
   .panel {
